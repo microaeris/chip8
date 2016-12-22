@@ -1,62 +1,23 @@
-// sudo apt-get install libsdl2-2.0
-// sudo apt-get install libsdl2-dev
-// gcc -o chip8 -O2 -Wall -std=c11 -g chip8.c `sdl2-config --cflags --libs`
-
-//✦ sdl2-config --cflags --libs
-//-I/usr/include/SDL2 -D_REENTRANT
-//-L/usr/lib/x86_64-linux-gnu -lSDL2
-
-// chip8.c then -I(lib name) -L(path)
-
-
-
-
-//Using SDL and standard IO
 #include <SDL.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
-
-//Screen dimension constants
-const int SCREEN_WIDTH = 64;
-const int SCREEN_HEIGHT = 32;
-
-int tick=0, done=0;
-
-// Chip 8
-uint16_t opcode;
-uint8_t mem[4096];
-uint8_t V[16];
-uint16_t I; // Index register
-uint16_t pc; 
-uint8_t gfx[64*32];
-uint8_t delay_timer;
-uint8_t sound_timer;
-uint16_t stack[16];
-uint16_t sp;
-uint8_t key[16];
-
-typedef enum {
-    ERROR_NONE,
-    ERROR_SDL_INIT,
-} ERROR_T;
+#include "chip8.h"
 
 int init_sdl(SDL_Window **window, SDL_Surface **surface) 
 {
-    //Initialize SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         SDL_Quit();
         return ERROR_SDL_INIT;
     }
 
-    //Create window
     *window = SDL_CreateWindow("Chip8", 
                                SDL_WINDOWPOS_UNDEFINED, 
                                SDL_WINDOWPOS_UNDEFINED, 
                                SCREEN_WIDTH, 
                                SCREEN_HEIGHT, 
                                SDL_WINDOW_SHOWN);
+
     if (*window == NULL) {
         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         SDL_DestroyWindow(*window);
@@ -64,19 +25,47 @@ int init_sdl(SDL_Window **window, SDL_Surface **surface)
         return ERROR_SDL_INIT;
     }
 
-    //Get window surface
     *surface = SDL_GetWindowSurface(*window);
     return ERROR_NONE;
 }
 
 void init_chip8() 
 {
-    
+    pc      = 0x200;  
+    opcode  = 0;
+    I       = 0;
+    sp      = 0;      
+
+    // Clear display  
+    // Clear stack
+    // Clear registers V0-VF
+    // Clear memory
+    // Reset timers
+
+    // Load fontset
+    memcpy(mem + 0x050, chip8_fontset, sizeof(chip8_fontset));
 }
 
-void emulate_cycle ()
+void emulate_cycle()
 {
+    // Fetch Opcode
+    opcode = memory[pc] << 8 | memory[pc + 1];
 
+    // Decode Opcode
+
+    // Execute Opcode
+
+    // Update timers
+    if (delay_timer > 0) {
+        --delay_timer;
+    }
+
+    if (sound_timer > 0) {
+        if(sound_timer == 1) {
+            printf("BEEP!\n");
+        }
+        --sound_timer;
+    } 
 }
 
 void load_rom()
@@ -89,11 +78,10 @@ void load_rom()
     size_t read_size = fread(mem + 0x200, 1, size, rom_file);
 
     if (size != read_size) {
-        printf("Did not read ROM correctly\n");
+        printf("Did not read the ROM file correctly\n");
         exit(0);
     }
 
-    // // Check that I read the correct thing
     // printf("size: %zu\n", size);
     // printf("read_size: %zu\n", read_size);
     // for (int i = 0; i < size; i++) {
@@ -134,13 +122,12 @@ int main(int argc, char *args[])
         return res;
     }
 
-    // setupInput();
-    // myChip8.initialize();
+    // TODO: Setup keypad 
+    init_chip8();
     load_rom();
 
     while(!done) {
         emulate_cycle();
-
         render_screen(window, surface);
 
         // // If the draw flag is set, update the screen
