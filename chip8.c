@@ -1,10 +1,6 @@
-// cc -o sdltest -O2 -Wall -std=c11 -g `sdl-config --cflags --libs` sdltest.c
-
-
 // sudo apt-get install libsdl2-2.0
 // sudo apt-get install libsdl2-dev
 // gcc -o chip8 -O2 -Wall -std=c11 -g chip8.c `sdl2-config --cflags --libs`
-
 
 //✦ sdl2-config --cflags --libs
 //-I/usr/include/SDL2 -D_REENTRANT
@@ -14,55 +10,72 @@
 
 
 
+
 //Using SDL and standard IO
 #include <SDL.h>
 #include <stdio.h>
 
 //Screen dimension constants
-const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 480;
+const int SCREEN_WIDTH = 64;
+const int SCREEN_HEIGHT = 32;
 
-int main( int argc, char* args[] )
+int tick=0, done=0;
+
+void setpixel(SDL_Surface *surface, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+    *((uint32_t*)surface->pixels + (y*surface->pitch/4) + x) = SDL_MapRGB(surface->format, r, g, b);
+}
+
+int main(int argc, char *args[])
 {
-    //The window we'll be rendering to
-    SDL_Window* window = NULL;
-    
-    //The surface contained by the window
-    SDL_Surface* screenSurface = NULL;
+    SDL_Window *window = NULL;
+    SDL_Surface *surface = NULL;
+    SDL_Event e;
 
     //Initialize SDL
-    if( SDL_Init( SDL_INIT_VIDEO ) < 0 )
-    {
-        printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 0;
     }
-    else
-    {
-        //Create window
-        window = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
-        if( window == NULL )
-        {
-            printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
+
+    //Create window
+    window = SDL_CreateWindow("Chip8", 
+                              SDL_WINDOWPOS_UNDEFINED, 
+                              SDL_WINDOWPOS_UNDEFINED, 
+                              SCREEN_WIDTH, 
+                              SCREEN_HEIGHT, 
+                              SDL_WINDOW_SHOWN);
+    if (window == NULL) {
+        printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 0;
+    }
+
+    //Get window surface
+    surface = SDL_GetWindowSurface(window);
+    
+    while(!done) {
+        // render
+        SDL_LockSurface(surface);
+        for(int y=0; y<surface->h; y++) {
+            for(int x=0; x<surface->w; x++) {
+                setpixel(surface, x, y, (x*x)/256+3*y+tick, (y*y)/256+x+tick, tick);
+            }
         }
-        else
-        {
-            //Get window surface
-            screenSurface = SDL_GetWindowSurface( window );
+        SDL_UnlockSurface(surface);
+        SDL_UpdateWindowSurface(window);
+        tick++;
 
-            //Fill the surface white
-            SDL_FillRect( screenSurface, NULL, SDL_MapRGB( screenSurface->format, 0xFF, 0xFF, 0xFF ) );
-            
-            //Update the surface
-            SDL_UpdateWindowSurface( window );
-
-            //Wait two seconds
-            SDL_Delay( 2000 );
+        // check for key/quit
+        while(SDL_PollEvent(&e)) {
+            done |= (e.type == SDL_QUIT || e.type == SDL_KEYDOWN);
         }
     }
+
     //Destroy window
-    SDL_DestroyWindow( window );
-
+    SDL_DestroyWindow(window);
     //Quit SDL subsystems
     SDL_Quit();
-
     return 0;
 }
