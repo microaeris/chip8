@@ -10,7 +10,7 @@
 #define N(op)   (op & 0x000F)
 #define NN(op)  (op & 0x00FF)
 #define NNN(op) (op & 0x0FFF)
-#define screen_idx(x, y) (x + y * SCREEN_WIDTH)
+#define screen_idx(x, y) (x + (y * SCREEN_WIDTH))
 
 int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
              SDL_Surface **surface, SDL_Texture **texture)
@@ -109,7 +109,7 @@ void decode(uint16_t opcode)
     uint8_t x = X(opcode);
     uint8_t y = Y(opcode);
     uint8_t pixels;
-    uint8_t index;
+    uint32_t index;
 
     switch(opcode & 0xF000) {
         case 0x1000:
@@ -144,11 +144,11 @@ void decode(uint16_t opcode)
             break;
         case 0xD000: // draw
             V[0xF] = 0;
-            for (int row = 0; row < N(opcode); ++row) {
+            for (uint8_t row = 0; row < N(opcode); ++row) {
                 pixels = mem[I + row];
-                for(int col = 0; col < 8; ++col) {
+                for(uint8_t col = 0; col < 8; ++col) {
                     if((pixels & (0x80 >> col)) != 0) {
-                        index = screen_idx(V[x] + col, V[y] + row);
+                        index = screen_idx((V[x] + row), (V[y] + col));
                         if(gfx[index] == WHITE) {
                             V[0xF] = 1;
                         }
@@ -188,14 +188,14 @@ void render_screen(SDL_Window *window, SDL_Renderer *renderer,
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
 
-    for (int j = 0; j < 32; ++j) {
-        for (int i = 0; i < 64; ++i) {
-            printf("%x ", gfx[screen_idx(i,j)]&0xF);
-        }
-        printf("\n");
-    }
-    printf("\n");
-    printf("\n");
+    // for (int j = 0; j < 32; ++j) {
+    //     for (int i = 0; i < 64; ++i) {
+    //         printf("%x ", gfx[screen_idx(i,j)]&0xF);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("\n");
+    // printf("\n");
 }
 
 int main(int argc, char *args[])
@@ -237,7 +237,3 @@ int main(int argc, char *args[])
     SDL_Quit();
     return ERROR_NONE;
 }
-
-
-//128 draws
-//
