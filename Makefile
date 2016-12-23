@@ -1,6 +1,6 @@
 CFLAGS=-O3 -Wall -std=c11
 LDFLAGS=`sdl2-config --cflags --libs`
-DEPS = chip8.h
+DEPS=chip8.h
 
 all: chip8
 
