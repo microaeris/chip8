@@ -59,6 +59,7 @@ int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
     SDL_RenderSetLogicalSize(*renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+    SDL_SetWindowSize(*window, 640, 320);
 
     SDL_SetRenderDrawColor(*renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     SDL_RenderClear(*renderer);
@@ -74,6 +75,7 @@ void init_chip8()
     I       = 0;
     sp      = 0;
 
+    // TODO
     // Clear display
     // Clear stack
     // Clear registers V0-VF
@@ -89,6 +91,7 @@ void emulate_cycle()
     opcode = mem[pc] << 8 | mem[pc + 1];
     decode(opcode);
 
+    // TODO this needs to run at 60 Hz
     if (delay_timer > 0) {
         --delay_timer;
     }
@@ -145,7 +148,7 @@ void decode(uint16_t opcode)
                 pixels = mem[I + row];
                 for(int col = 0; col < 8; ++col) {
                     if((pixels & (0x80 >> col)) != 0) {
-                        index = screen_idx(x + col, y + row);
+                        index = screen_idx(V[x] + col, V[y] + row);
                         if(gfx[index] == WHITE) {
                             V[0xF] = 1;
                         }
@@ -187,7 +190,7 @@ void render_screen(SDL_Window *window, SDL_Renderer *renderer,
 
     for (int j = 0; j < 32; ++j) {
         for (int i = 0; i < 64; ++i) {
-            printf("%x ", gfx[screen_idx(i,j)]);
+            printf("%x ", gfx[screen_idx(i,j)]&0xF);
         }
         printf("\n");
     }
@@ -219,6 +222,7 @@ int main(int argc, char *args[])
             drawFlag = false;
         }
 
+        // TODO
         // // Store key press state (Press and Release)
         // myChip8.setKeys();
         tick++;
@@ -233,3 +237,7 @@ int main(int argc, char *args[])
     SDL_Quit();
     return ERROR_NONE;
 }
+
+
+//128 draws
+//
