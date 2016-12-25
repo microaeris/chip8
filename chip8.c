@@ -1,6 +1,11 @@
-#include <SDL.h>
+// TODO
+// write blog post about SDL and resizing windows, and general windowing
+// Rom selection screen
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <SDL.h>
 #include "chip8.h"
 
 #define WHITE 0xFFFFFFFF
@@ -10,7 +15,7 @@
 #define N(op)   (op & 0x000F)
 #define NN(op)  (op & 0x00FF)
 #define NNN(op) (op & 0x0FFF)
-#define screen_idx(x, y) (x + (y * SCREEN_WIDTH))
+#define screen_idx(x, y) ((x) + ((y) * SCREEN_WIDTH))
 
 int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
              SDL_Surface **surface, SDL_Texture **texture)
@@ -70,6 +75,8 @@ int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 
 void init_chip8()
 {
+    srand(time(NULL));
+
     pc      = 0x200;
     opcode  = 0;
     I       = 0;
@@ -112,11 +119,38 @@ void decode(uint16_t opcode)
     uint32_t index;
 
     switch(opcode & 0xF000) {
+        case 0x0000:
+            switch(NNN(opcode)) {
+                case 0x0E0:
+                    memset(gfx, 0, sizeof(gfx));
+                    drawFlag = true;
+                    pc += 2;
+                    break;
+                case 0x0EE:
+                    pc = stack[sp--];
+                    break;
+                default:
+                    // Call a RCA 1802 program! FIXME
+                    stack[sp++] = pc;
+                    pc = NNN(opcode);
+                    break;
+            }
+            break;
         case 0x1000:
             pc = NNN(opcode);
             break;
+        case 0x2000:
+            stack[sp++] = pc;
+            pc = NNN(opcode);
         case 0x3000:
             if (V[x] == NN(opcode)) {
+                pc += 4;
+            } else {
+                pc += 2;
+            }
+            break;
+        case 0x4000:
+            if (V[x] != NN(opcode)) {
                 pc += 4;
             } else {
                 pc += 2;
@@ -131,7 +165,43 @@ void decode(uint16_t opcode)
             pc += 2;
             break;
         case 0x8000:
-            V[x] = V[y];
+            switch(N(opcode)) {
+                case 0x0:
+                    V[x] = V[y];
+                    break;
+                case 0x1:
+                    V[x] |= V[y];
+                    break;
+                case 0x2:
+                    V[x] &= V[y];
+                    break;
+                case 0x3:
+                    V[x] ^= V[y];
+                    break;
+                case 0x4:
+                    V[0xF] = V[y] > (0xFF - V[x]); // carry bit
+                    V[x] += V[y];
+                    break;
+                case 0x5:
+                    V[0xF] = V[x] < V[y]; // borrow bit
+                    V[x] -= V[y];
+                    break;
+                case 0x6:
+                    V[0xF] = V[x] & 0x1;
+                    V[x] >>= 1;
+                    break;
+                case 0x7:
+                    V[0xF] = V[y] < V[x]; // borrow bit
+                    V[x] = V[y] - V[x];
+                    break;
+                case 0xE:
+                    V[0xF] = V[x] & 0x80;
+                    V[x] <<= 1;
+                    break;
+                default:
+                    printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
+                    break;
+            }
             pc += 2;
             break;
         case 0xA000:
@@ -148,7 +218,7 @@ void decode(uint16_t opcode)
                 pixels = mem[I + row];
                 for(uint8_t col = 0; col < 8; ++col) {
                     if((pixels & (0x80 >> col)) != 0) {
-                        index = screen_idx((V[x] + row), (V[y] + col));
+                        index = screen_idx(V[x] + row, V[y] + col);
                         if(gfx[index] == WHITE) {
                             V[0xF] = 1;
                         }
@@ -159,8 +229,53 @@ void decode(uint16_t opcode)
             drawFlag = true;
             pc += 2;
             break;
+        case 0xF000:
+            switch(NN(opcode)) {
+                case 0x07:
+                    V[x] = delay_timer;
+                    break;
+                case 0x0A:
+                    // Wait for a key press
+                    SDL_WaitEvent(&e);
+                    if (e.type == SDL_KEYDOWN) {
+                        V[x] = handle_key_down(e.key.keysym.sym);
+                    }
+                    break;
+                case 0x15:
+                    delay_timer = V[x];
+                    break;
+                case 0x18:
+                    sound_timer = V[x];
+                    break;
+                case 0x1E:
+                    I += V[x];
+                    break;
+                case 0x29:
+                    // FIXME Character sprite address
+                    I = 0x50 + V[x] * 5;
+                    break;
+                case 0x33:
+                    // BCD
+                    mem[I] = V[x] / 100;
+                    mem[I+1] = (V[x] / 10 ) % 10;
+                    mem[I+2] = V[x] % 10;
+                    break;
+                case 0x55:
+                    // Reg dump
+                    memcpy(mem + I, V, sizeof(V));
+                    break;
+                case 0x65:
+                    // Reg load
+                    memcpy(V, mem + I, sizeof(V));
+                    break;
+                default:
+                    printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
+                    break;
+            }
+            pc += 2;
+            break;
         default:
-            printf ("Unknown opcode: 0x%X\n", opcode);
+            printf ("Totally unknown opcode: 0x%X\n", opcode);
             break;
     }
 }
@@ -168,10 +283,10 @@ void decode(uint16_t opcode)
 void load_rom()
 {
     // Copy rom from file to mem array
-    FILE *rom_file = fopen("./roms/MAZE", "r");
-    fseek(rom_file, 0, SEEK_END); // seek to end of file
-    size_t size = ftell(rom_file); // get current file pointer
-    fseek(rom_file, 0, SEEK_SET); // seek back to beginning of file
+    FILE *rom_file = fopen("./roms/KALEID", "r");
+    fseek(rom_file, 0, SEEK_END);   // seek to end of file
+    size_t size = ftell(rom_file);  // get current file pointer
+    fseek(rom_file, 0, SEEK_SET);   // seek back to beginning of file
     size_t read_size = fread(mem + 0x200, 1, size, rom_file);
 
     if (size != read_size) {
@@ -195,23 +310,145 @@ void render_screen(SDL_Window *window, SDL_Renderer *renderer,
     //     printf("\n");
     // }
     // printf("\n");
-    // printf("\n");
+}
+
+/* Handle hex key press
+ * Keypad                   Keyboard
+ * +-+-+-+-+                +-+-+-+-+
+ * |1|2|3|C|                |1|2|3|4|
+ * +-+-+-+-+                +-+-+-+-+
+ * |4|5|6|D|                |Q|W|E|R|
+ * +-+-+-+-+       =>       +-+-+-+-+
+ * |7|8|9|E|                |A|S|D|F|
+ * +-+-+-+-+                +-+-+-+-+
+ * |A|0|B|F|                |Z|X|C|V|
+ * +-+-+-+-+                +-+-+-+-+
+ */
+uint8_t handle_key_down(SDL_Keycode keycode) // TODO move this to its own file
+{
+    switch(keycode) {
+        case SDLK_1:
+            key[0x1] = 1;
+            return 0x1;
+        case SDLK_2:
+            key[0x2] = 1;
+            return 0x2;
+        case SDLK_3:
+            key[0x3] = 1;
+            return 0x3;
+        case SDLK_4:
+            key[0xC] = 1;
+            return 0xC;
+        case SDLK_q:
+            key[0x4] = 1;
+            return 0x4;
+        case SDLK_w:
+            key[0x5] = 1;
+            return 0x5;
+        case SDLK_e:
+            key[0x6] = 1;
+            return 0x6;
+        case SDLK_r:
+            key[0xD] = 1;
+            return 0xD;
+        case SDLK_a:
+            key[0x7] = 1;
+            return 0x7;
+        case SDLK_s:
+            key[0x8] = 1;
+            return 0x8;
+        case SDLK_d:
+            key[0x9] = 1;
+            return 0x9;
+        case SDLK_f:
+            key[0xE] = 1;
+            return 0xE;
+        case SDLK_z:
+            key[0xA] = 1;
+            return 0xA;
+        case SDLK_x:
+            key[0x0] = 1;
+            return 0x0;
+        case SDLK_c:
+            key[0xB] = 1;
+            return 0xB;
+        case SDLK_v:
+            key[0xF] = 1;
+            return 0xF;
+        default:
+            return -1;
+    }
+}
+
+uint8_t handle_key_up(SDL_Keycode keycode)
+{
+    switch(keycode) {
+        case SDLK_1:
+            key[0x1] = 0;
+            return 0x1;
+        case SDLK_2:
+            key[0x2] = 0;
+            return 0x2;
+        case SDLK_3:
+            key[0x3] = 0;
+            return 0x3;
+        case SDLK_4:
+            key[0xC] = 0;
+            return 0xC;
+        case SDLK_q:
+            key[0x4] = 0;
+            return 0x4;
+        case SDLK_w:
+            key[0x5] = 0;
+            return 0x5;
+        case SDLK_e:
+            key[0x6] = 0;
+            return 0x6;
+        case SDLK_r:
+            key[0xD] = 0;
+            return 0xD;
+        case SDLK_a:
+            key[0x7] = 0;
+            return 0x7;
+        case SDLK_s:
+            key[0x8] = 0;
+            return 0x8;
+        case SDLK_d:
+            key[0x9] = 0;
+            return 0x9;
+        case SDLK_f:
+            key[0xE] = 0;
+            return 0xE;
+        case SDLK_z:
+            key[0xA] = 0;
+            return 0xA;
+        case SDLK_x:
+            key[0x0] = 0;
+            return 0x0;
+        case SDLK_c:
+            key[0xB] = 0;
+            return 0xB;
+        case SDLK_v:
+            key[0xF] = 0;
+            return 0xF;
+        default:
+            return -1;
+    }
 }
 
 int main(int argc, char *args[])
 {
+    // TODO make these global
     SDL_Window *window = NULL;
     SDL_Surface *surface = NULL; // TODO remove this later
     SDL_Renderer *renderer = NULL;
     SDL_Texture *texture = NULL;
-    SDL_Event e;
 
     int res = 0;
     if ((res = init_sdl(&window, &renderer, &surface, &texture)) != ERROR_NONE) {
         return res;
     }
 
-    // TODO: Setup keypad
     init_chip8();
     load_rom();
 
@@ -222,15 +459,17 @@ int main(int argc, char *args[])
             drawFlag = false;
         }
 
-        // TODO
-        // // Store key press state (Press and Release)
-        // myChip8.setKeys();
-        tick++;
-
-        // check for key/quit
+        // check for key press
         while(SDL_PollEvent(&e)) {
-            done |= (e.type == SDL_QUIT || e.type == SDL_KEYDOWN);
+            done |= (e.type == SDL_QUIT); //|| e.type == SDL_KEYDOWN);
+            if (e.type == SDL_KEYDOWN) {
+                handle_key_down(e.key.keysym.sym);
+            } else if (e.type == SDL_KEYUP) {
+                handle_key_up(e.key.keysym.sym);
+            }
         }
+
+        tick++; // TODO remove this later
     }
 
     SDL_DestroyWindow(window);

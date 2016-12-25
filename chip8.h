@@ -46,11 +46,16 @@ typedef enum {
     ERROR_SDL_INIT,
 } ERROR_T;
 
+//SDL
+SDL_Event e;
+
 int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
              SDL_Surface **surface, SDL_Texture **texture);
 void init_chip8();
 void emulate_cycle();
 void decode(uint16_t opcode);
 void load_rom();
+uint8_t handle_key_down(SDL_Keycode keycode);
+uint8_t handle_key_up(SDL_Keycode keycode);
 void render_screen(SDL_Window *window, SDL_Renderer *renderer,
                    SDL_Surface *surface, SDL_Texture *texture);
