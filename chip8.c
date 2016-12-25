@@ -76,11 +76,10 @@ int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 void init_chip8()
 {
     srand(time(NULL));
-
-    pc      = 0x200;
-    opcode  = 0;
-    I       = 0;
-    sp      = 0;
+    pc = 0x200;
+    // opcode = 0;
+    // I = 0;
+    // sp = 0;
 
     // TODO
     // Clear display
@@ -90,7 +89,7 @@ void init_chip8()
     // Reset timers
 
     // Load fontset
-    memcpy(mem + 0x050, chip8_fontset, sizeof(chip8_fontset));
+    memcpy(mem + 0x50, chip8_fontset, sizeof(chip8_fontset));
 }
 
 void emulate_cycle()
@@ -113,6 +112,7 @@ void emulate_cycle()
 
 void decode(uint16_t opcode)
 {
+    printf("opcode: %x\n", opcode);
     uint8_t x = X(opcode);
     uint8_t y = Y(opcode);
     uint8_t pixels;
@@ -127,7 +127,7 @@ void decode(uint16_t opcode)
                     pc += 2;
                     break;
                 case 0x00EE:
-                    pc = stack[sp--];
+                    pc = stack[--sp];
                     break;
                 default:
                     // Call a RCA 1802 program! FIXME
@@ -207,7 +207,7 @@ void decode(uint16_t opcode)
                     break;
                 default:
                     printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
-                    break;
+                    exit(ERROR_BAD_OPCODE);
             }
             pc += 2;
             break;
@@ -264,6 +264,7 @@ void decode(uint16_t opcode)
                     break;
                 default:
                     printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
+                    //exit(ERROR_BAD_OPCODE);
                     break;
             }
             break;
@@ -308,20 +309,20 @@ void decode(uint16_t opcode)
                     break;
                 default:
                     printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
-                    break;
+                    exit(ERROR_BAD_OPCODE);
             }
             pc += 2;
             break;
         default:
             printf ("Totally unknown opcode: 0x%X\n", opcode);
-            break;
+            exit(ERROR_BAD_OPCODE);
     }
 }
 
 void load_rom()
 {
     // Copy rom from file to mem array
-    FILE *rom_file = fopen("./roms/GUESS", "r");
+    FILE *rom_file = fopen("./roms/MISSILE", "r");
     fseek(rom_file, 0, SEEK_END);   // seek to end of file
     size_t size = ftell(rom_file);  // get current file pointer
     fseek(rom_file, 0, SEEK_SET);   // seek back to beginning of file

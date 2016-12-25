@@ -17,7 +17,7 @@ uint32_t gfx[64*32]; // RGBA buffer
 uint8_t delay_timer;
 uint8_t sound_timer;
 uint16_t stack[16];
-uint16_t sp;
+uint16_t sp; // Points to the next free spot on the stack
 uint8_t key[16];
 uint8_t last_key;
 bool drawFlag;
@@ -45,6 +45,7 @@ unsigned char chip8_fontset[80] =
 typedef enum {
     ERROR_NONE,
     ERROR_SDL_INIT,
+    ERROR_BAD_OPCODE,
 } ERROR_T;
 
 //SDL
