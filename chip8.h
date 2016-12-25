@@ -19,6 +19,7 @@ uint8_t sound_timer;
 uint16_t stack[16];
 uint16_t sp;
 uint8_t key[16];
+uint8_t last_key;
 bool drawFlag;
 
 unsigned char chip8_fontset[80] =

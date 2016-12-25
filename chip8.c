@@ -31,7 +31,7 @@ int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
                                SDL_WINDOWPOS_UNDEFINED,
                                SCREEN_WIDTH,
                                SCREEN_HEIGHT,
-                               SDL_WINDOW_SHOWN); // SDL_WINDOW_FULLSCREEN
+                               SDL_WINDOW_SHOWN);
 
     if (*window == NULL) {
         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
@@ -121,12 +121,12 @@ void decode(uint16_t opcode)
     switch(opcode & 0xF000) {
         case 0x0000:
             switch(NNN(opcode)) {
-                case 0x0E0:
+                case 0x00E0:
                     memset(gfx, 0, sizeof(gfx));
                     drawFlag = true;
                     pc += 2;
                     break;
-                case 0x0EE:
+                case 0x00EE:
                     pc = stack[sp--];
                     break;
                 default:
@@ -151,6 +151,13 @@ void decode(uint16_t opcode)
             break;
         case 0x4000:
             if (V[x] != NN(opcode)) {
+                pc += 4;
+            } else {
+                pc += 2;
+            }
+            break;
+        case 0x5000:
+            if (V[x] == V[y]) {
                 pc += 4;
             } else {
                 pc += 2;
@@ -204,9 +211,19 @@ void decode(uint16_t opcode)
             }
             pc += 2;
             break;
+        case 0x9000:
+            if (V[x] != V[y]) {
+                pc += 4;
+            } else {
+                pc += 2;
+            }
+            break;
         case 0xA000:
             I = NNN(opcode);
             pc += 2;
+            break;
+        case 0xB000:
+            pc = NNN(opcode) + V[0];
             break;
         case 0xC000: // rand, and
             V[x] = (rand() % 256) & NN(opcode);
@@ -228,6 +245,27 @@ void decode(uint16_t opcode)
             }
             drawFlag = true;
             pc += 2;
+            break;
+        case 0xE000:
+            switch(NN(opcode)) {
+                case 0x9E:
+                    if (last_key == V[x]) {
+                        pc += 4;
+                    } else {
+                        pc += 2;
+                    }
+                    break;
+                case 0xA1:
+                    if (last_key != V[x]) {
+                        pc += 4;
+                    } else {
+                        pc += 2;
+                    }
+                    break;
+                default:
+                    printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
+                    break;
+            }
             break;
         case 0xF000:
             switch(NN(opcode)) {
@@ -283,7 +321,7 @@ void decode(uint16_t opcode)
 void load_rom()
 {
     // Copy rom from file to mem array
-    FILE *rom_file = fopen("./roms/KALEID", "r");
+    FILE *rom_file = fopen("./roms/GUESS", "r");
     fseek(rom_file, 0, SEEK_END);   // seek to end of file
     size_t size = ftell(rom_file);  // get current file pointer
     fseek(rom_file, 0, SEEK_SET);   // seek back to beginning of file
@@ -453,20 +491,20 @@ int main(int argc, char *args[])
     load_rom();
 
     while(!done) {
+        // check for key press
+        while (SDL_PollEvent(&e)) {
+            done |= (e.type == SDL_QUIT);
+            if (e.type == SDL_KEYDOWN) {
+                last_key = handle_key_down(e.key.keysym.sym);
+            } else if (e.type == SDL_KEYUP) {
+                last_key = handle_key_up(e.key.keysym.sym);
+            }
+        }
+
         emulate_cycle();
         if (drawFlag) {
             render_screen(window, renderer, surface, texture);
             drawFlag = false;
-        }
-
-        // check for key press
-        while(SDL_PollEvent(&e)) {
-            done |= (e.type == SDL_QUIT); //|| e.type == SDL_KEYDOWN);
-            if (e.type == SDL_KEYDOWN) {
-                handle_key_down(e.key.keysym.sym);
-            } else if (e.type == SDL_KEYUP) {
-                handle_key_up(e.key.keysym.sym);
-            }
         }
 
         tick++; // TODO remove this later
