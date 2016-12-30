@@ -88,16 +88,20 @@ void init_chip8()
     // Clear memory
     // Reset timers
 
-    // Load fontset
+    // Load font set
     memcpy(mem + 0x50, chip8_fontset, sizeof(chip8_fontset));
 }
 
 void emulate_cycle()
 {
     opcode = mem[pc] << 8 | mem[pc + 1];
+    uint32_t timeout = SDL_GetTicks() + 16;
     decode(opcode);
 
-    // TODO this needs to run at 60 Hz
+    // Run program at 60 Hz
+    while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
+    }
+
     if (delay_timer > 0) {
         --delay_timer;
     }
@@ -235,7 +239,7 @@ void decode(uint16_t opcode)
                 pixels = mem[I + row];
                 for(uint8_t col = 0; col < 8; ++col) {
                     if((pixels & (0x80 >> col)) != 0) {
-                        index = screen_idx(V[x] + row, V[y] + col);
+                        index = screen_idx(V[x] + col, V[y] + row);
                         if(gfx[index] == WHITE) {
                             V[0xF] = 1;
                         }
@@ -249,14 +253,14 @@ void decode(uint16_t opcode)
         case 0xE000:
             switch(NN(opcode)) {
                 case 0x9E:
-                    if (last_key == V[x]) {
+                    if (key_down == V[x]) {
                         pc += 4;
                     } else {
                         pc += 2;
                     }
                     break;
                 case 0xA1:
-                    if (last_key != V[x]) {
+                    if (key_down != V[x]) {
                         pc += 4;
                     } else {
                         pc += 2;
@@ -264,9 +268,10 @@ void decode(uint16_t opcode)
                     break;
                 default:
                     printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
-                    //exit(ERROR_BAD_OPCODE);
+                    exit(ERROR_BAD_OPCODE);
                     break;
             }
+            key_down = 0;
             break;
         case 0xF000:
             switch(NN(opcode)) {
@@ -322,7 +327,7 @@ void decode(uint16_t opcode)
 void load_rom()
 {
     // Copy rom from file to mem array
-    FILE *rom_file = fopen("./roms/MISSILE", "r");
+    FILE *rom_file = fopen("./roms/GUESS", "r");
     fseek(rom_file, 0, SEEK_END);   // seek to end of file
     size_t size = ftell(rom_file);  // get current file pointer
     fseek(rom_file, 0, SEEK_SET);   // seek back to beginning of file
@@ -496,9 +501,9 @@ int main(int argc, char *args[])
         while (SDL_PollEvent(&e)) {
             done |= (e.type == SDL_QUIT);
             if (e.type == SDL_KEYDOWN) {
-                last_key = handle_key_down(e.key.keysym.sym);
+                key_down = handle_key_down(e.key.keysym.sym);
             } else if (e.type == SDL_KEYUP) {
-                last_key = handle_key_up(e.key.keysym.sym);
+                handle_key_up(e.key.keysym.sym);
             }
         }
 

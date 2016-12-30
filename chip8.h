@@ -19,7 +19,7 @@ uint8_t sound_timer;
 uint16_t stack[16];
 uint16_t sp; // Points to the next free spot on the stack
 uint8_t key[16];
-uint8_t last_key;
+uint8_t key_down; // Stores the key pressed in this cycle. can be none. can be checked once (and then it will be reset)
 bool drawFlag;
 
 unsigned char chip8_fontset[80] =
