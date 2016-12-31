@@ -116,7 +116,7 @@ void emulate_cycle()
 
 void decode(uint16_t opcode)
 {
-    printf("opcode: %x\n", opcode);
+    // printf("opcode: %x\n", opcode);
     uint8_t x = X(opcode);
     uint8_t y = Y(opcode);
     uint8_t pixels;
@@ -131,7 +131,7 @@ void decode(uint16_t opcode)
                     pc += 2;
                     break;
                 case 0x00EE:
-                    pc = stack[--sp];
+                    pc = stack[--sp] + 2;
                     break;
                 default:
                     // Call a RCA 1802 program! FIXME
@@ -146,6 +146,7 @@ void decode(uint16_t opcode)
         case 0x2000:
             stack[sp++] = pc;
             pc = NNN(opcode);
+            break;
         case 0x3000:
             if (V[x] == NN(opcode)) {
                 pc += 4;
@@ -280,10 +281,10 @@ void decode(uint16_t opcode)
                     break;
                 case 0x0A:
                     // Wait for a key press
-                    SDL_WaitEvent(&e);
-                    if (e.type == SDL_KEYDOWN) {
-                        V[x] = handle_key_down(e.key.keysym.sym);
-                    }
+                    do {
+                        SDL_WaitEvent(&e);
+                    } while (e.type != SDL_KEYDOWN);
+                    V[x] = handle_key_down(e.key.keysym.sym);
                     break;
                 case 0x15:
                     delay_timer = V[x];
@@ -306,11 +307,11 @@ void decode(uint16_t opcode)
                     break;
                 case 0x55:
                     // Reg dump
-                    memcpy(mem + I, V, sizeof(V));
+                    memcpy(mem + I, V, sizeof(x + 1));
                     break;
                 case 0x65:
                     // Reg load
-                    memcpy(V, mem + I, sizeof(V));
+                    memcpy(V, mem + I, sizeof(x + 1));
                     break;
                 default:
                     printf ("Unknown opcode: 0x%X\n", opcode); // FIXME this is redundant
